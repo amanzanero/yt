@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/amanzanero/yt/youtube"
 	"github.com/spf13/cobra"
 	"log"
+	"time"
 )
 
 var count int
@@ -27,13 +29,15 @@ func commentsCmd(_ *cobra.Command, args []string) {
 		log.Fatalln(configErr)
 	}
 
+	start := time.Now()
 	youtubeService := youtube.New(youtube.WithApiKey(config.YoutubeApiKey))
-
 	comments, err := youtubeService.ListComments(args[0], count)
+	stop := time.Since(start).Milliseconds()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	for _, comment := range comments {
-		log.Println(comment)
+	for i, comment := range comments {
+		fmt.Printf("%d: %s\n", i, comment)
 	}
+	fmt.Printf("took %dms\n", stop)
 }

@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/amanzanero/yt/youtube"
 	"github.com/spf13/cobra"
 	"log"
+	"time"
 )
 
 func init() {
@@ -26,9 +28,12 @@ func winnerCmd(_ *cobra.Command, args []string) {
 
 	youtubeService := youtube.New(youtube.WithApiKey(config.YoutubeApiKey))
 
+	start := time.Now()
 	winner, err := youtubeService.RandomCommenter(args[0])
+	total := time.Since(start).Milliseconds()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Println(winner)
+	fmt.Println("Winner: " + winner)
+	fmt.Printf("took %dms\n", total)
 }

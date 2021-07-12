@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -114,7 +113,7 @@ func (s *Service) fetchTopLevelComments(videoId string, count int) ([]Comment, e
 
 	page := 1
 	topLevelComments := make([]Comment, 0)
-	log.Printf("getting page #%d, nextPageToken:%s", page, nextPageToken)
+	fmt.Printf("\rgetting comment page %d", page)
 	comments, err := getCommentPage()
 	if err != nil {
 		return nil, err
@@ -128,7 +127,7 @@ func (s *Service) fetchTopLevelComments(videoId string, count int) ([]Comment, e
 
 	for nextPageToken != "" {
 		page++
-		log.Printf("getting page #%d, nextPageToken:%s", page, nextPageToken)
+		fmt.Printf("\rgetting comment page %d", page)
 		nextComments, err := getCommentPage()
 		if err != nil {
 			return nil, err
@@ -167,7 +166,7 @@ func (s *Service) fetchTopLevelCommenters(videoId string) ([]string, error) {
 
 	page := 1
 	topLevelCommenters := make(map[string]bool)
-	log.Printf("getting page #%d, nextPageToken:%s", page, nextPageToken)
+	fmt.Printf("\rgetting comment page %d", page)
 	comments, err := getCommentPage()
 	if err != nil {
 		return nil, err
@@ -178,7 +177,7 @@ func (s *Service) fetchTopLevelCommenters(videoId string) ([]string, error) {
 
 	for nextPageToken != "" {
 		page++
-		log.Printf("getting page #%d, nextPageToken:%s", page, nextPageToken)
+		fmt.Printf("\rgetting comment page %d", page)
 		nextComments, err := getCommentPage()
 		if err != nil {
 			return nil, err
@@ -187,6 +186,7 @@ func (s *Service) fetchTopLevelCommenters(videoId string) ([]string, error) {
 			topLevelCommenters[item.Snippet.TopLevelComment.Snippet.Author] = true
 		}
 	}
+	fmt.Println()
 
 	commenters := make([]string, len(topLevelCommenters))
 	i := 0
