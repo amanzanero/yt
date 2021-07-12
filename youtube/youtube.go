@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
+	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -74,49 +75,157 @@ type commentResponse struct {
 			} `json:"topLevelComment"`
 		} `json:"snippet"`
 	} `json:"items"`
+	NextPageToken string `json:"nextPageToken"`
 }
 
-func (y *Service) fetchTopLevelComments(videoId string, count int) (*commentResponse, error) {
-	url := fmt.Sprintf(
+func (s *Service) toplevelCommentsUrl(videoId, nextPageToken string, count int) string {
+	apiUrl := fmt.Sprintf(
 		"https://www.googleapis.com/youtube/v3/commentThreads?videoId=%s&key=%s&textFormat=plainText&part=snippet&maxResults=%s",
 		videoId,
-		y.apiKey,
+		s.apiKey,
 		strconv.Itoa(count),
 	)
+	if nextPageToken != "" {
+		return apiUrl + fmt.Sprintf("&pageToken=%s", nextPageToken)
+	}
+	return apiUrl
+}
 
-	resp, err := http.Get(url)
+func (s *Service) fetchTopLevelComments(videoId string, count int) ([]Comment, error) {
+	nextPageToken := ""
+
+	getCommentPage := func() (*commentResponse, error) {
+		parsedResp := new(commentResponse)
+		apiUrl := s.toplevelCommentsUrl(videoId, nextPageToken, count)
+		resp, err := http.Get(apiUrl)
+		defer func() { _ = resp.Body.Close() }()
+		if err != nil {
+			return nil, err
+		}
+
+		decodeErr := json.NewDecoder(resp.Body).Decode(parsedResp)
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		nextPageToken = parsedResp.NextPageToken
+
+		return parsedResp, nil
+	}
+
+	page := 1
+	topLevelComments := make([]Comment, 0)
+	log.Printf("getting page #%d, nextPageToken:%s", page, nextPageToken)
+	comments, err := getCommentPage()
 	if err != nil {
 		return nil, err
 	}
-	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
-	}(resp.Body)
-
-	parsedResp := new(commentResponse)
-	decodeErr := json.NewDecoder(resp.Body).Decode(parsedResp)
-	if decodeErr != nil {
-		return nil, decodeErr
+	for _, item := range comments.Items {
+		topLevelComments = append(topLevelComments, Comment{
+			Author:  item.Snippet.TopLevelComment.Snippet.Author,
+			Comment: item.Snippet.TopLevelComment.Snippet.TextOriginal,
+		})
 	}
 
-	return parsedResp, nil
+	for nextPageToken != "" {
+		page++
+		log.Printf("getting page #%d, nextPageToken:%s", page, nextPageToken)
+		nextComments, err := getCommentPage()
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range nextComments.Items {
+			topLevelComments = append(topLevelComments, Comment{
+				Author:  item.Snippet.TopLevelComment.Snippet.Author,
+				Comment: item.Snippet.TopLevelComment.Snippet.TextOriginal,
+			})
+		}
+	}
+
+	return topLevelComments, nil
 }
 
-func (y *Service) ListComments(videoUrl string, maxCount int) ([]Comment, error) {
+func (s *Service) fetchTopLevelCommenters(videoId string) ([]string, error) {
+	nextPageToken := ""
+
+	getCommentPage := func() (*commentResponse, error) {
+		parsedResp := new(commentResponse)
+		apiUrl := s.toplevelCommentsUrl(videoId, nextPageToken, 100)
+		resp, err := http.Get(apiUrl)
+		defer func() { _ = resp.Body.Close() }()
+		if err != nil {
+			return nil, err
+		}
+
+		decodeErr := json.NewDecoder(resp.Body).Decode(parsedResp)
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		nextPageToken = parsedResp.NextPageToken
+
+		return parsedResp, nil
+	}
+
+	page := 1
+	topLevelCommenters := make(map[string]bool)
+	log.Printf("getting page #%d, nextPageToken:%s", page, nextPageToken)
+	comments, err := getCommentPage()
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range comments.Items {
+		topLevelCommenters[item.Snippet.TopLevelComment.Snippet.Author] = true
+	}
+
+	for nextPageToken != "" {
+		page++
+		log.Printf("getting page #%d, nextPageToken:%s", page, nextPageToken)
+		nextComments, err := getCommentPage()
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range nextComments.Items {
+			topLevelCommenters[item.Snippet.TopLevelComment.Snippet.Author] = true
+		}
+	}
+
+	commenters := make([]string, len(topLevelCommenters))
+	i := 0
+	for author := range topLevelCommenters {
+		commenters[i] = author
+		i++
+	}
+
+	return commenters, nil
+}
+
+func (s *Service) ListComments(videoUrl string, maxCount int) ([]Comment, error) {
 	videoId, urlErr := parseVideoUrl(videoUrl)
 	if urlErr != nil {
 		return nil, urlErr
 	}
 
-	topLevelComments, fetchErr := y.fetchTopLevelComments(videoId, maxCount)
+	topLevelComments, fetchErr := s.fetchTopLevelComments(videoId, maxCount)
 	if fetchErr != nil {
 		return nil, fetchErr
 	}
-	comments := make([]Comment, len(topLevelComments.Items))
-	for i, comment := range topLevelComments.Items {
-		comments[i].Comment = comment.Snippet.TopLevelComment.Snippet.TextOriginal
-		comments[i].Author = comment.Snippet.TopLevelComment.Snippet.Author
+
+	return topLevelComments, nil
+}
+
+func (s *Service) RandomCommenter(videoUrl string) (string, error) {
+	videoId, urlErr := parseVideoUrl(videoUrl)
+	if urlErr != nil {
+		return "", urlErr
 	}
-	return comments, nil
+
+	topLevelCommenters, fetchErr := s.fetchTopLevelCommenters(videoId)
+	if fetchErr != nil {
+		return "", fetchErr
+	}
+
+	winner := rand.Intn(len(topLevelCommenters))
+
+	return topLevelCommenters[winner], nil
 }
 
 var InvalidUrlErr = errors.New("youtube url was not in correct format")

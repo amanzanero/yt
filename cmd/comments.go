@@ -34,6 +34,6 @@ func commentsCmd(_ *cobra.Command, args []string) {
 		log.Fatalln(err)
 	}
 	for _, comment := range comments {
-		log.Println(comment.Author)
+		log.Println(comment)
 	}
 }
