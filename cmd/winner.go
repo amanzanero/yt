@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var winnerCount int
+
 func init() {
 	localCmd := &cobra.Command{
 		Use:     "winner",
@@ -17,6 +19,7 @@ func init() {
 		Args:    cobra.MinimumNArgs(1),
 		Run:     winnerCmd,
 	}
+	localCmd.Flags().IntVar(&winnerCount, "count", 1, "Total number of winners (each commenter has an equal chance of winning regardless of comment count)")
 	rootCmd.AddCommand(localCmd)
 }
 
@@ -29,11 +32,13 @@ func winnerCmd(_ *cobra.Command, args []string) {
 	youtubeService := youtube.New(youtube.WithApiKey(config.YoutubeApiKey))
 
 	start := time.Now()
-	winner, err := youtubeService.RandomCommenter(args[0])
+	winners, err := youtubeService.RandomCommenters(args[0], winnerCount)
 	total := time.Since(start).Milliseconds()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Println("Winner: " + winner)
+	for i, winner := range winners {
+		fmt.Printf("Winner #%d: \"%s\"\n", i+1, winner)
+	}
 	fmt.Printf("took %dms\n", total)
 }

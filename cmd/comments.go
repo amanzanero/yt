@@ -37,7 +37,7 @@ func commentsCmd(_ *cobra.Command, args []string) {
 		log.Fatalln(err)
 	}
 	for i, comment := range comments {
-		fmt.Printf("%d: %s\n", i, comment)
+		fmt.Printf("%d: [%s] %s\n", i+1, comment.Author, comment.Comment)
 	}
 	fmt.Printf("took %dms\n", stop)
 }
