@@ -25,7 +25,6 @@ jobs:
       - uses: go-semantic-release/action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          update-file: package.json
           changelog-generator-opt: "emojis=true"
           dry: true
           changelog-file: CHANGELOG.md

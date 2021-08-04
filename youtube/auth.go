@@ -2,6 +2,7 @@ package youtube
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/fatih/color"
 	cv "github.com/jimlambrt/go-oauth-pkce-code-verifier"
@@ -97,7 +98,6 @@ func WriteToken(token *oauth2.Token) error {
 
 // AuthorizeUser implements the PKCE OAuth2 flow.
 func AuthorizeUser(cfg oauth2.Config) {
-	red := color.New(color.FgRed)
 	var codeVerifier, _ = cv.CreateCodeVerifier()
 	authorizationURL := cfg.AuthCodeURL(
 		"state",
@@ -109,7 +109,7 @@ func AuthorizeUser(cfg oauth2.Config) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		if code == "" {
-			_, _ = red.Println("yt: Url Param 'code' is missing")
+			color.Red("yt: Url Param 'code' is missing")
 			_, _ = io.WriteString(w, "Error: could not find 'code' URL parameter\n")
 
 			// close the HTTP server and return
@@ -120,7 +120,7 @@ func AuthorizeUser(cfg oauth2.Config) {
 		// trade the authorization code and the code verifier for an access token
 		token, err := cfg.Exchange(context.Background(), code, oauth2.SetAuthURLParam(codeVerifierKey, codeVerifier.String()))
 		if err != nil {
-			_, _ = red.Printf("could not get access token: %v\n", err)
+			color.Red("could not get access token: %v\n", err)
 			_, _ = io.WriteString(w, "Error: could not retrieve access token\n")
 			// close the HTTP server and return
 			cleanup(server)
@@ -129,7 +129,7 @@ func AuthorizeUser(cfg oauth2.Config) {
 
 		err = WriteToken(token)
 		if err != nil {
-			_, _ = red.Printf("could not write config file: %v\n", err)
+			color.Red("could not write config file: %v\n", err)
 			_, _ = io.WriteString(w, "error: could not store access token\n")
 			// close the HTTP server and return
 			cleanup(server)
@@ -154,7 +154,7 @@ func AuthorizeUser(cfg oauth2.Config) {
 	// parse the redirect URL for the port number
 	u, err := url.Parse(cfg.RedirectURL)
 	if err != nil {
-		_, _ = red.Printf("yt: bad redirect URL: %s\n", err)
+		color.Red("yt: bad redirect URL: %s\n", err)
 		os.Exit(1)
 	}
 
@@ -162,22 +162,22 @@ func AuthorizeUser(cfg oauth2.Config) {
 	port := fmt.Sprintf(":%s", u.Port())
 	l, err := net.Listen("tcp", port)
 	if err != nil {
-		_, _ = red.Printf("yt: can't listen to port %s: %s\n", port, err)
+		color.Red("yt: can't listen to port %s: %s\n", port, err)
 		os.Exit(1)
 	}
 
 	// open a browser window to the authorizationURL
 	err = open.Start(authorizationURL)
 	if err != nil {
-		_, _ = red.Printf("yt: can't open browser to URL %s: %s\n", authorizationURL, err)
+		color.Red("yt: can't open browser to URL %s: %s\n", authorizationURL, err)
 		os.Exit(1)
 	}
 
 	// start the blocking web server loop
 	// this will exit when the handler gets fired and calls server.Close()
 	serveErr := server.Serve(l)
-	if serveErr != nil {
-		_, _ = red.Printf("yt: %v\n", serveErr)
+	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+		color.Red("yt: %v\n", serveErr)
 	}
 }
 
@@ -186,6 +186,8 @@ func cleanup(server *http.Server) {
 	// we run this as a goroutine so that this function falls through and
 	// the socket to the browser gets flushed/closed before the server goes away
 	go func() {
-		_ = server.Close()
+		if err := server.Close(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			color.Red("yt: %v\n", err)
+		}
 	}()
 }

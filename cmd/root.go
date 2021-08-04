@@ -20,7 +20,7 @@ var (
 		ClientSecret: "",
 		Endpoint: oauth2.Endpoint{
 			AuthURL:   "https://accounts.google.com/o/oauth2/v2/auth/authorize",
-			TokenURL:  "http://localhost:8080/token",
+			TokenURL:  "https://yt-cli-321905.ue.r.appspot.com/token",
 			AuthStyle: oauth2.AuthStyleInParams,
 		},
 		Scopes:      []string{youtube.YoutubeReadonlyScope, youtube.YoutubeForceSslScope},
